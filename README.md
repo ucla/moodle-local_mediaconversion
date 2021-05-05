@@ -1,7 +1,7 @@
 # Intro
 
-Moodle plugin to automatically convert videos uploaded to the Kaltura streaming
-video platform
+Moodle plugin to automatically convert media files uploaded to the Kaltura streaming
+media platform
 
 ## Requirements
 
@@ -30,8 +30,9 @@ Must set the following settings to enable the plugin:
 
 ## Notes
 
-* Will convert video files uploaded as a file resource or embedded in a label or
+* Will convert media files uploaded as a file resource or embedded in a label or
 embedded in the description of any activity or resource.
+* Will convert media files uploaded as link in activity descriptions.
 * Will not convert video files in forum posts, quiz questions, assignments, etc.
 We will accept any pull requests that does figure out how to implement
 conversion for those areas.

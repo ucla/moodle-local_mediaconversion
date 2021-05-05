@@ -37,7 +37,7 @@ require_once(__DIR__.'/../../mod/kalvidres/lib.php');
 require_once(__DIR__.'/../kaltura/locallib.php');
 
 define('CATEGORY_PATH_END', 'InContext');
-// Video height and width.
+// Media height and width.
 define('MC_KALTURA_HEIGHT', 402);
 define('MC_KALTURA_WIDTH', 608);
 
@@ -71,7 +71,7 @@ function local_cm_get_kaltura_client($configsettings) {
  *
  * @param stdClass $course
  * @return string  A comma separated string for Kaltura to know who should be
- *                 collaborators and publishers on all videos uploaded for a course.
+ *                 collaborators and publishers on all media uploaded for a course.
  */
 function local_cm_get_course_admin_usernames($course) {
      // Anyone who can grade Kaltura assignment is a course admin.
@@ -85,7 +85,7 @@ function local_cm_get_course_admin_usernames($course) {
 }
 
 /**
- * Uploads a video using its path and returns the resulting
+ * Uploads a media file using its path and returns the resulting
  * media entry.
  *
  * @param KalturaClient $client
@@ -93,10 +93,11 @@ function local_cm_get_course_admin_usernames($course) {
  * @param string $title
  * @param string $description
  * @param stdClass $course  Needed to set the entry collaborators.
+ * @param string $mimetype
  * @return KalturaMediaEntry|null
  */
 function local_cm_upload_video_from_filepath(\KalturaClient $client, $filepath,
-        $title, $description, $course) {
+        $title, $description, $course, $mimetype) {
     $uploadtoken = $client->media->upload($filepath);
     $entry = new KalturaMediaEntry();
     $entry->entitledUsersEdit = local_cm_get_course_admin_usernames($course);
@@ -104,6 +105,9 @@ function local_cm_upload_video_from_filepath(\KalturaClient $client, $filepath,
     $entry->name = $title;
     $entry->description = $description;
     $entry->mediaType = KalturaMediaType::VIDEO;
+    if (substr($mimetype, 0, 5) === 'audio') {
+        $entry->mediaType = KalturaMediaType::AUDIO;
+    }
     try {
         $entry = $client->media->addFromUploadedFile($entry, $uploadtoken);
     } catch (Exception $ex) {
@@ -114,19 +118,23 @@ function local_cm_upload_video_from_filepath(\KalturaClient $client, $filepath,
 }
 
 /**
- * Uploads a video from its URL and returns its media entry
+ * Uploads a media file from its URL and returns its media entry
  *
  * @param \KalturaClient $client
  * @param string $url
  * @param string $title
  * @param string $description
+ * @param string $mimetype
  * @return KalturaMediaEntry|null
  */
-function local_cm_upload_video_from_url(\KalturaClient $client, $url, $title, $description) {
+function local_cm_upload_video_from_url(\KalturaClient $client, $url, $title, $description, $mimetype) {
     $entry = new KalturaMediaEntry();
     $entry->name = $title;
     $entry->description = $description;
     $entry->mediaType = KalturaMediaType::VIDEO;
+    if (substr($mimetype, 0, 5) === 'audio') {
+        $entry->mediaType = KalturaMediaType::AUDIO;
+    }
     try {
         $entry = $client->media->addFromUrl($entry, $url);
     } catch (Exception $ex) {
@@ -232,7 +240,7 @@ function local_cm_get_kaltura_category(\KalturaClient $client, $course, $basecat
 }
 
 /**
- * Adds the uploaded video entry to its category
+ * Adds the uploaded media entry to its category
  *
  * @param KalturaClient $client
  * @param int $categoryid
@@ -421,13 +429,13 @@ function local_cm_package_argsinfo($courseandmodinfo, $name, $modname = 'resourc
 }
 
 /**
- * Uploads the video and generates the corresponding modinfo for its
+ * Uploads the media file and generates the corresponding modinfo for its
  * kaltura video resource.
  *
  * @param stored_file $file
  * @param stdClass $argsinfo
  * @param string $userid
- * @param string $cmid  The module ID the video is being converted for -
+ * @param string $cmid  The module ID the media is being converted for -
  *                      used only for error reporting.
  * @return stdClass|null
  */
@@ -452,15 +460,15 @@ function local_cm_convert_video(stored_file $file, $argsinfo, $userid, $cmid) {
     $client = local_cm_get_kaltura_client($configsettings);
     // Upload the file to Kaltura.
     if (!$entry = local_cm_upload_video_from_filepath($client,
-            $pathtofile, $argsinfo->name, $argsinfo->description, $argsinfo->courseobject)) {
+            $pathtofile, $argsinfo->name, $argsinfo->description, $argsinfo->courseobject, $file->get_mimetype())) {
         return null;
     }
-    // Get/make the appropriate category in the KMC for the video.
+    // Get/make the appropriate category in the KMC for the media.
     if (!$category = local_cm_get_kaltura_category($client,
             $argsinfo->courseobject, $localconfigsettings->base_category_path)) {
         return null;
     }
-    // Put the video in the category.
+    // Put the media in the category.
     if (!$categoryentry = local_cm_add_category_entry($client,
             $category->id, $entry->id)) {
         return null;
@@ -474,13 +482,13 @@ function local_cm_convert_video(stored_file $file, $argsinfo, $userid, $cmid) {
         mtrace('Warning: temp file for cm instance ' . $cmid . ' could not be '
                 . 'deleted since it was not found');
     }
-    mtrace('Successfully uploaded video with entry ID ' . $modinfo->entry_id
+    mtrace('Successfully uploaded media with entry ID ' . $modinfo->entry_id
             . ' for cm instance ' . $cmid);
     return $modinfo;
 }
 
 /**
- * Loops through files and finds the main video file.
+ * Loops through files and finds the main media file.
  *
  * @param int $contextid
  * @param string $modulename
@@ -491,11 +499,11 @@ function local_cm_get_video_file($contextid, $modulename = 'resource', $filearea
     // Get the file.
     $fs = get_file_storage();
     $files = $fs->get_area_files($contextid, "mod_$modulename", $filearea);
-    // Find a video file.
+    // Find a media file.
     $mainfile = null;
     foreach ($files as $file) {
-        // Check for a proper filesize and a video.
-        if (intval($file->get_filesize()) > 0 && substr($file->get_mimetype(), 0, 5) === 'video') {
+        // Check for a proper filesize and a media file.
+        if (intval($file->get_filesize()) > 0 && (substr($file->get_mimetype(), 0, 5) === 'video' || substr($file->get_mimetype(), 0, 5) === 'audio')) {
             $mainfile = $file;
         }
     }
@@ -503,7 +511,7 @@ function local_cm_get_video_file($contextid, $modulename = 'resource', $filearea
 }
 
 /**
- * This function gets the main video file, uploads it to Kaltura, and adds the new module.
+ * This function gets the main media file, uploads it to Kaltura, and adds the new module.
  * It also converts files embedded in the intro text if necessary.
  *
  * @param int $contextid
@@ -515,13 +523,14 @@ function local_cm_get_video_file($contextid, $modulename = 'resource', $filearea
  */
 function local_cm_convert_and_add_module($contextid, $courseandmodinfo, $userid,
         $cmid, $cmname) {
-    // Get the video file.
+    global $DB;
+    // Get the media file.
     if (!($mainfile = local_cm_get_video_file($contextid))) {
         return false;
     }
-    // Package info and try to convert the video.
+    // Package info and try to convert the media.
     $argsinfo = local_cm_package_argsinfo($courseandmodinfo, $cmname);
-    // If there are pluginfiles, we can't convert this video, since the
+    // If there are pluginfiles, we can't convert this media, since the
     // pluginfile URLs will break (and yes, we must manually check for
     // the boolean 'false' because strpos can return falsey offsets).
     if (strpos($argsinfo->intro, '@@PLUGINFILE@@/') !== false) {
@@ -538,7 +547,7 @@ function local_cm_convert_and_add_module($contextid, $courseandmodinfo, $userid,
         return false;
     }
     if (!$newmodinfo = local_cm_convert_video($mainfile, $argsinfo, $userid, $cmid)) {
-        mtrace('Failed to convert video named ' . $mainfile->get_filename()
+        mtrace('Failed to convert media named ' . $mainfile->get_filename()
                 . ' for cm instance ' . $cmid);
         return false;
     }
@@ -580,7 +589,7 @@ function local_cm_get_filenames_from_intro($intro, $startmatch, $endmatch) {
  */
 function local_cm_get_video_file_by_name($files, $filename) {
     foreach ($files as $introfile) {
-        if (substr($introfile->get_mimetype(), 0, 5) === 'video'
+        if ((substr($introfile->get_mimetype(), 0, 5) === 'video' || substr($introfile->get_mimetype(), 0, 5) === 'audio')
                 && $introfile->get_filename() === urldecode($filename)) {
             return $introfile;
         }
@@ -589,7 +598,7 @@ function local_cm_get_video_file_by_name($files, $filename) {
 }
 
 /**
- * Converts embedded video files in a module's text for a module and returns the
+ * Converts embedded media files in a module's text for a module and returns the
  * new intro text.
  *
  * @param string $modulename
@@ -624,7 +633,7 @@ function local_cm_convert_and_get_new_text($modulename, $cmid, $contextid, $user
     $numconverted = 0;
     // Loop through each of the filenames found.
     foreach ($filenames as $filename) {
-        // Find the appropriate video file.
+        // Find the appropriate media file.
         if (!$file = local_cm_get_video_file_by_name($introfiles, $filename)) {
             continue;
         }
@@ -632,10 +641,10 @@ function local_cm_convert_and_get_new_text($modulename, $cmid, $contextid, $user
         // file - this is important since we call local_cm_package_argsinfo with
         // an empty string for the name field.
         $argsinfo->name = $file->get_filename();
-        // Try to convert the video itself. A lot of the modinfo it returns is
+        // Try to convert the media itself. A lot of the modinfo it returns is
         // useless for this task, but we do need the entry id.
         if (!$newtempmodinfo = local_cm_convert_video($file, $argsinfo, $userid, $cmid)) {
-                mtrace('Failed to convert video named ' . $file->get_filename()
+                mtrace('Failed to convert media named ' . $file->get_filename()
                         . ' for cm instance ' . $cmid);
             continue;
         }
@@ -660,14 +669,14 @@ function local_cm_convert_and_get_new_text($modulename, $cmid, $contextid, $user
             }
         } else {
             // Otherwise warn that a file was uploaded and not used.
-            mtrace('Warning: Kaltura video with entry id ' . $newtempmodinfo->entry_id
+            mtrace('Warning: Kaltura media with entry id ' . $newtempmodinfo->entry_id
                     . ' was uploaded but was not added to the text. This'
-                    . ' video should probably be removed.');
+                    . ' media should probably be removed.');
         }
     }
     if ($numconverted > 0) {
         mtrace('Successfully replaced ' . $numconverted . '/' . count($filenames)
-                . " embedded $filearea files with Kaltura videos for cm instance "
+                . " embedded $filearea files with Kaltura media for cm instance "
                 . $cmid);
         rebuild_course_cache($courseandmodinfo[0]->id, true);
         return $newtext;

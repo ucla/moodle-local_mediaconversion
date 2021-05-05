@@ -70,7 +70,7 @@ class local_mediaconversion_observer {
 
     /**
      * This is called whenever a course module is added or updated. It dispatches the convert
-     * media task to convert video files to kaltura video resources and also dispatches
+     * media task to convert media files to kaltura media resources and also dispatches
      * the convert intro media task.
      *
      * @param stdClass $eventdata

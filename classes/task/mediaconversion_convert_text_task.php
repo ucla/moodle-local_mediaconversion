@@ -48,7 +48,7 @@ class mediaconversion_convert_text_task extends base_adhoc_task {
         $customdata = $this->get_custom_data();
         $data = $customdata->eventdata;
         try {
-            // Convert the video files embedded in content text. Note that we don't need
+            // Convert the media files embedded in content text. Note that we don't need
             // to delete the old files as Moodle automatically cleans them up for us.
             if ($newintro = local_cm_convert_and_get_new_text($data->other->modulename,
                     $data->objectid, $data->contextid, $customdata->userid)) {
