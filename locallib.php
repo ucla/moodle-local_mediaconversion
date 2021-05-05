@@ -643,11 +643,11 @@ function local_cm_convert_and_get_new_text($modulename, $cmid, $contextid, $user
         $content = '<a href="' . local_kaltura_cm_build_source_url($newtempmodinfo->entry_id,
             $newtempmodinfo->height, $newtempmodinfo->width) . '">tinymce-kalturamedia-embed'
             . "||$filename||$newtempmodinfo->width||$newtempmodinfo->height</a>";
-        // Replace the old embedded text with the new Kaltura text (str_replace is much
-        // faster than preg_replace, which is why we need $startmatch and $endmatch).
+        // Replace the old embedded text with the new Kaltura text.
         $numreplaced = 0;
-        $newtext = str_replace($startmatch . $filename . $endmatch
-                . urldecode($filename) . '</a>', $content, $newtext, $numreplaced);
+        $filename = preg_quote($filename);
+        $pattern = '/<a href="@@PLUGINFILE@@\/' . $filename . '">[^<]*<\/a>/';
+        $newtext = preg_replace($pattern, $content, $newtext, -1, $numreplaced);
         // If any strings were replaced, increment the counter for converted files.
         if ($numreplaced > 0) {
             $numconverted++;
